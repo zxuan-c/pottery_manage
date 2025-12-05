@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>須白工作室管理系統 | Pottery Studio Manager</title>
+    
+    <!-- 1. 載入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. 載入 React 和 ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- 3. 載入 Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- 4. 載入 Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- 5. 載入 Supabase Client (新增) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f5f5f4; }
+        ::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a8a29e; }
+    </style>
+</head>
+<body class="bg-stone-50 text-stone-800">
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        // --- Supabase 設定 ---
+        const supabaseUrl = 'https://dgdolkbubvyggijsddtl.supabase.co';
+        const supabaseKey = 'sb_publishable_-tIVFIoo0VXjtrWrKadCgw__QO8IAbW';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        // --- 範例資料 (用於初始化資料庫) ---
+        const SAMPLE_FUNDS = [
+            { date: '2025-07-26', name: '翹 - 投入資金', type: 'capital', amount: 100000, note: '初始投資' },
+            { date: '2025-07-26', name: '軒 - 投入資金', type: 'capital', amount: 50000, note: '初始投資' },
+            { date: '2025-08-31', name: '軒媽 - 週轉金', type: 'liability', amount: 100000, note: '借款人: 軒' },
+            { date: '2025-12-03', name: '軒 - 借款', type: 'liability', amount: 40000, note: '短期借貸' },
+        ];
+        const SAMPLE_ASSETS = [
+             { name: '工作室押金', category: '押金資產', value: 32000, date: '2025-01-01' },
+             { name: '拉胚機', category: '設備', value: 4000, date: '2025-01-01' },
+             { name: '電窯訂金', category: '設備', value: 40950, date: '2025-01-01' },
+             { name: '置物架', category: '設備', value: 2598, date: '2025-01-01' },
+             { name: '層板架 (x9)', category: '設備', value: 720, date: '2025-01-01' },
+             { name: '餐桌', category: '設備', value: 1799, date: '2025-01-01' },
+             { name: 'xuan工作桌 (x2)', category: '設備', value: 2598, date: '2025-01-01' },
+             { name: 'chiau工作桌 (x2)', category: '設備', value: 7350, date: '2025-01-01' },
+             { name: '玻璃杯', category: '道具', value: 499, date: '2025-01-01' },
+             { name: '鐵盤', category: '道具', value: 174, date: '2025-01-01' },
+             { name: '浸釉小提籃', category: '設備', value: 134, date: '2025-01-01' },
+             { name: '循環扇', category: '設備', value: 1690, date: '2025-01-01' },
+             { name: '普通椅子 (x3)', category: '設備', value: 1497, date: '2025-01-01' },
+             { name: '收納盒 (x3)', category: '設備', value: 1197, date: '2025-01-01' },
+             { name: '窗簾桿', category: '設備', value: 199, date: '2025-01-01' },
+             { name: '小畚箕', category: '設備', value: 59, date: '2025-01-01' },
+             { name: '電扇', category: '設備', value: 1280, date: '2025-01-01' },
+             { name: '電子秤', category: '設備', value: 739, date: '2025-01-01' },
+             { name: '感應燈', category: '設備', value: 305, date: '2025-01-01' },
+             { name: '門鈴', category: '設備', value: 454, date: '2025-01-01' },
+             { name: '吹風機', category: '設備', value: 1449, date: '2025-01-01' },
+             { name: '延長線', category: '設備', value: 999, date: '2025-01-01' },
+             { name: '拖把', category: '設備', value: 589, date: '2025-01-01' },
+             { name: '貓窩', category: '設備', value: 235, date: '2025-01-01' },
+             { name: '工作椅', category: '設備', value: 1499, date: '2025-01-01' },
+             { name: '椅墊', category: '設備', value: 199, date: '2025-01-01' },
+             { name: '掛勾架', category: '設備', value: 399, date: '2025-01-01' },
+             { name: '水瓢', category: '道具', value: 49, date: '2025-01-01' },
+             { name: '層板 (x4)', category: '設備', value: 800, date: '2025-01-01' },
+             { name: '垃圾桶', category: '設備', value: 199, date: '2025-01-01' },
+             { name: '臉盆', category: '設備', value: 99, date: '2025-01-01' },
+             { name: 'AT18-鋁柄修坯刀', category: '工具', value: 40, date: '2025-01-01' },
+             { name: 'BW08-陶藝雕塑木刀', category: '工具', value: 50, date: '2025-01-01' },
+             { name: 'RP11木條/壓條', category: '工具', value: 80, date: '2025-01-01' },
+             { name: 'GT01-圓形海綿', category: '工具', value: 18, date: '2025-01-01' },
+             { name: 'PE10-陶瓷彩繪毛筆', category: '工具', value: 45, date: '2025-01-01' },
+             { name: 'RP07-01-天然櫸木桿麵棍', category: '工具', value: 100, date: '2025-01-01' },
+             { name: 'HP06-打洞鑽洞工具', category: '工具', value: 55, date: '2025-01-01' },
+             { name: 'DW09-刻花極細鋼絲刀', category: '工具', value: 110, date: '2025-01-01' },
+             { name: 'MT31-02-金鋼砂銼刀-圓銼', category: '工具', value: 20, date: '2025-01-01' },
+             { name: 'XT01-正方小木板規板無腳', category: '工具', value: 180, date: '2025-01-01' },
+             { name: '玻璃量筒', category: '工具', value: 155, date: '2025-01-01' },
+             { name: 'pp5號 原料空瓶', category: '工具', value: 35, date: '2025-01-01' },
+             { name: '塑膠滴管 (x6)', category: '工具', value: 12, date: '2025-01-01' },
+             { name: '電子秤(大重量)', category: '設備', value: 780, date: '2025-01-01' },
+             { name: '打氣筒', category: '工具', value: 75, date: '2025-01-01' },
+             { name: '剪刀', category: '工具', value: 85, date: '2025-01-01' },
+             { name: 'roichen坐墊', category: '設備', value: 1399, date: '2025-01-01' },
+             { name: '瓦斯噴槍', category: '工具', value: 730, date: '2025-01-01' },
+             { name: '層架組 (x2)', category: '設備', value: 998, date: '2025-01-01' },
+             { name: '保鮮盒 (x3)', category: '道具', value: 57, date: '2025-01-01' },
+             { name: '削皮器', category: '工具', value: 39, date: '2025-01-01' },
+             { name: '洗滌刷', category: '工具', value: 29, date: '2025-01-01' },
+             { name: '玻璃杯/量壺/攪拌碗', category: '工具', value: 156, date: '2025-01-01' },
+             { name: '塑膠滴瓶 (x4)', category: '工具', value: 88, date: '2025-01-01' },
+             { name: '矽膠面膜碗', category: '工具', value: 45, date: '2025-01-01' },
+             { name: '巧克力融化鍋', category: '工具', value: 116, date: '2025-01-01' },
+             { name: 'AC02-拉坯工具組-06-木片', category: '工具', value: 50, date: '2025-01-01' },
+             { name: 'AT03-大頭刮刀/修坯刀', category: '工具', value: 98, date: '2025-01-01' },
+             { name: 'BT31-雙頭木珠棒組', category: '工具', value: 42, date: '2025-01-01' },
+             { name: 'GT73-尼龍篩網', category: '工具', value: 360, date: '2025-01-01' },
+             { name: '濾水器', category: '設備', value: 1697, date: '2025-01-01' },
+             { name: '水泥攪拌器', category: '工具', value: 1136, date: '2025-01-01' },
+             { name: '熱水壺', category: '設備', value: 699, date: '2025-01-01' },
+             { name: '拉胚圓木片', category: '工具', value: 216, date: '2025-01-01' },
+             { name: '不鏽鋼升降台', category: '設備', value: 355, date: '2025-01-01' },
+             { name: '金剛石銼刀', category: '工具', value: 102, date: '2025-01-01' },
+             { name: '防雨浪板', category: '設備', value: 560, date: '2025-01-01' },
+             { name: '大美工刀', category: '工具', value: 80, date: '2025-01-01' },
+             { name: '棉手套', category: '工具', value: 20, date: '2025-01-01' },
+             { name: '陶藝道具', category: '工具', value: 708, date: '2025-01-01' },
+             { name: '木籃 (x4)', category: '道具', value: 720, date: '2025-01-01' },
+             { name: '五金百貨', category: '道具', value: 325, date: '2025-01-01' },
+             { name: '展示架與聖誕節飾品', category: '道具', value: 799, date: '2025-01-01' }
+        ];
+        const SAMPLE_INVENTORY = [
+             { name: '26號白瓷土', category: '土類', quantity: 1, unit: '包(25KG)', unitCost: 790, minStock: 2 },
+             { name: '507熟料土', category: '土類', quantity: 1, unit: '包(20KG)', unitCost: 480, minStock: 2 },
+             { name: '501台灣瓷土', category: '土類', quantity: 1, unit: '包(20KG)', unitCost: 480, minStock: 2 },
+             { name: '熟料土', category: '土類', quantity: 20, unit: 'KG', unitCost: 30, minStock: 5 },
+             { name: '日本特赤7號土', category: '土類', quantity: 1, unit: '包', unitCost: 200, minStock: 1 },
+             { name: '日本深海藍御影土', category: '土類', quantity: 1, unit: '包', unitCost: 255, minStock: 1 },
+             { name: '充氣袋15*20', category: '包材', quantity: 26, unit: '個', unitCost: 4, minStock: 10 },
+             { name: '充氣袋20*20', category: '包材', quantity: 30, unit: '個', unitCost: 4, minStock: 10 },
+             { name: '充氣袋20*30', category: '包材', quantity: 15, unit: '個', unitCost: 5, minStock: 10 },
+             { name: '氣泡柱25cm', category: '包材', quantity: 1, unit: '卷', unitCost: 255, minStock: 1 },
+             { name: '氣泡柱20cm', category: '包材', quantity: 1, unit: '卷', unitCost: 220, minStock: 1 },
+             { name: '氣泡柱15cm', category: '包材', quantity: 1, unit: '卷', unitCost: 196, minStock: 1 },
+             { name: 'Z2飛機盒', category: '包材', quantity: 20, unit: '個', unitCost: 8, minStock: 10 },
+             { name: '封箱膠帶', category: '包材', quantity: 4, unit: '卷', unitCost: 19, minStock: 2 },
+             { name: 'S80加厚紙箱', category: '包材', quantity: 38, unit: '個', unitCost: 17, minStock: 10 },
+             { name: 'S75加厚紙箱', category: '包材', quantity: 15, unit: '個', unitCost: 13, minStock: 10 },
+             { name: '蜂巢紙', category: '包材', quantity: 1, unit: '疊(100張)', unitCost: 475, minStock: 1 },
+             { name: '白色內襯紙', category: '包材', quantity: 1, unit: '卷', unitCost: 441, minStock: 1 },
+             { name: '牛皮包裝紙', category: '包材', quantity: 1, unit: '卷', unitCost: 140, minStock: 1 },
+             { name: 'S003熟料/馬萊砂', category: '原料/化學', quantity: 1, unit: 'KG', unitCost: 40, minStock: 1 },
+             { name: 'GR-02-二號白瓷漿', category: '原料/化學', quantity: 1, unit: 'KG', unitCost: 80, minStock: 1 },
+             { name: 'G027-碳酸鈉-蘇打灰', category: '原料/化學', quantity: 1, unit: 'KG', unitCost: 42, minStock: 1 },
+             { name: 'PA07 水玻璃', category: '原料/化學', quantity: 1, unit: '瓶(400g)', unitCost: 80, minStock: 1 },
+             { name: 'M002-鉀肥皂石膏脫模劑', category: '原料/化學', quantity: 1, unit: 'KG', unitCost: 250, minStock: 1 },
+             { name: '石膏粉', category: '原料/化學', quantity: 1, unit: '包(4KG)', unitCost: 153, minStock: 1 },
+             { name: '蜜蠟', category: '原料/化學', quantity: 0.5, unit: 'KG', unitCost: 420, minStock: 0.5 },
+             { name: '白蠟', category: '原料/化學', quantity: 1, unit: 'KG', unitCost: 130, minStock: 1 },
+             { name: '甘油', category: '原料/化學', quantity: 0.5, unit: 'KG', unitCost: 170, minStock: 0.5 },
+             { name: '非離子介面活性劑', category: '原料/化學', quantity: 0.5, unit: 'KG', unitCost: 160, minStock: 0.5 },
+             { name: 'neowax nf 乳化蠟', category: '原料/化學', quantity: 0.1, unit: 'KG', unitCost: 990, minStock: 0.1 },
+             { name: '皂土/膨潤土', category: '原料/化學', quantity: 1, unit: 'KG', unitCost: 0, minStock: 1 },
+             { name: '印度鉀長石', category: '原料/化學', quantity: 1, unit: 'KG', unitCost: 0, minStock: 1 },
+             { name: '日本蛙目土粉', category: '原料/化學', quantity: 1, unit: 'KG', unitCost: 0, minStock: 1 },
+             { name: '石英粉', category: '原料/化學', quantity: 1, unit: 'KG', unitCost: 0, minStock: 1 },
+             { name: '高黏度CMC', category: '原料/化學', quantity: 1, unit: 'KG', unitCost: 0, minStock: 1 },
+             { name: '巧克力陶藝釉下彩', category: '釉藥/色粉', quantity: 1, unit: '罐(59ml)', unitCost: 250, minStock: 1 },
+             { name: '無鋅透明釉', category: '釉藥/色粉', quantity: 2, unit: '包', unitCost: 200, minStock: 1 },
+             { name: 'Ferro Frit 3195', category: '釉藥/色粉', quantity: 1, unit: '包', unitCost: 380, minStock: 1 },
+             { name: 'EPK Kaolin', category: '釉藥/色粉', quantity: 1, unit: '包', unitCost: 85, minStock: 1 },
+             { name: '日本啞光白釉', category: '釉藥/色粉', quantity: 1, unit: '包', unitCost: 220, minStock: 1 },
+             { name: 'J908-夜幕灰色粉', category: '釉藥/色粉', quantity: 1, unit: '份(50g)', unitCost: 90, minStock: 1 },
+             { name: 'J808-果綠色粉', category: '釉藥/色粉', quantity: 1, unit: '份(50g)', unitCost: 60, minStock: 1 },
+             { name: 'J502-胡桃色色粉', category: '釉藥/色粉', quantity: 1, unit: '份(50g)', unitCost: 60, minStock: 1 },
+             { name: 'J603-迷幻紫色粉', category: '釉藥/色粉', quantity: 1, unit: '份(50g)', unitCost: 105, minStock: 1 },
+             { name: 'PC-56-古銅釉藥', category: '釉藥/色粉', quantity: 1, unit: '罐', unitCost: 710, minStock: 1 },
+             { name: 'WC-10焦糖奶油釉藥', category: '釉藥/色粉', quantity: 1, unit: '罐', unitCost: 630, minStock: 1 },
+             { name: '蠟燭用品', category: '其他', quantity: 1, unit: '組', unitCost: 414, minStock: 1 },
+             { name: '燈泡/電線', category: '其他', quantity: 1, unit: '組', unitCost: 389, minStock: 1 },
+             { name: '護木漆', category: '其他', quantity: 1, unit: '罐', unitCost: 226, minStock: 1 }
+        ];
+        const SAMPLE_TRANSACTIONS = [
+            { date: '2025-10-22', type: 'income', category: '回饋金', amount: 48, note: '釉藥堂回饋金 - 須白' },
+            { date: '2025-10-18', type: 'income', category: '網路開賣', amount: 67740, note: '須白 (實收)' },
+            { date: '2025-12-02', type: 'income', category: '市集', amount: 38220, note: '大毛市集 - 須白' },
+            { date: '2025-08-01', type: 'expense', category: '雜項', amount: 80, note: '大毛 - 貓盤4件代燒' },
+            { date: '2025-08-01', type: 'expense', category: '營運費用', amount: 16000, note: '工作室租金' },
+            { date: '2025-08-01', type: 'expense', category: '雜項', amount: 79, note: '蠟燭' },
+            { date: '2025-08-01', type: 'expense', category: '運費', amount: 1090, note: '採購 - IKEA運費' },
+            { date: '2025-08-01', type: 'expense', category: '營運費用', amount: 3000, note: '牽電工程' },
+            { date: '2025-08-02', type: 'expense', category: '雜項', amount: 299, note: '小推車' },
+            { date: '2025-08-02', type: 'expense', category: '雜項', amount: 549, note: '水煙殺蟲劑' },
+            { date: '2025-08-04', type: 'expense', category: '雜項', amount: 280, note: '打鑰匙' },
+            { date: '2025-08-04', type: 'expense', category: '雜項', amount: 1689, note: '好味 要去哪磨' },
+            { date: '2025-08-24', type: 'expense', category: '雜項', amount: 435, note: '水煙殺蟲劑' },
+            { date: '2025-08-25', type: 'expense', category: '雜項', amount: 99, note: '毛巾' },
+            { date: '2025-08-30', type: 'expense', category: '運費', amount: 319, note: '釉藥堂採購' },
+            { date: '2025-09-01', type: 'expense', category: '營運費用', amount: 16000, note: '工作室租金' },
+            { date: '2025-09-02', type: 'expense', category: '營運費用', amount: 468, note: '工作室電費' },
+            { date: '2025-09-07', type: 'expense', category: '雜項', amount: 20, note: '螺絲' },
+            { date: '2025-09-10', type: 'expense', category: '雜項', amount: 146, note: '菜瓜布/水管' },
+            { date: '2025-09-13', type: 'expense', category: '雜項', amount: 560, note: '鍋子/湯匙/溫度計' },
+            { date: '2025-09-14', type: 'expense', category: '雜項', amount: 165, note: '瓦斯罐/膨脹螺絲' },
+            { date: '2025-09-16', type: 'expense', category: '營運費用', amount: 1000, note: '大毛 - 包窯' },
+            { date: '2025-09-17', type: 'expense', category: '運費', amount: 2200, note: '拉胚機運費' },
+            { date: '2025-09-18', type: 'expense', category: '營運費用', amount: 5000, note: '大毛 - 時數會員' },
+            { date: '2025-09-18', type: 'expense', category: '雜項', amount: 120, note: '大毛 - 盤子代燒' },
+            { date: '2025-10-01', type: 'expense', category: '營運費用', amount: 16000, note: '工作室租金' },
+            { date: '2025-10-01', type: 'expense', category: '營運費用', amount: 834, note: '工作室電費' },
+            { date: '2025-10-01', type: 'expense', category: '營運費用', amount: 200, note: '工作室水費' },
+            { date: '2025-10-17', type: 'expense', category: '雜項', amount: 432, note: '作品小卡' },
+            { date: '2025-10-21', type: 'expense', category: '雜項', amount: 1000, note: '大毛 - 市集報名費' },
+            { date: '2025-10-22', type: 'expense', category: '雜項', amount: 698, note: '10月開賣包材' },
+            { date: '2025-10-31', type: 'expense', category: '薪資', amount: 27000, note: 'Chiau薪水' },
+            { date: '2025-11-01', type: 'expense', category: '營運費用', amount: 16000, note: '工作室租金' },
+            { date: '2025-11-01', type: 'expense', category: '營運費用', amount: 636, note: '工作室電費' },
+            { date: '2025-11-11', type: 'expense', category: '運費', amount: 190, note: '大毛計程車' },
+            { date: '2025-11-19', type: 'expense', category: '運費', amount: 198, note: '大毛計程車' },
+            { date: '2025-11-19', type: 'expense', category: '雜項', amount: 760, note: '餐費 - 一樂' },
+            { date: '2025-12-02', type: 'expense', category: '營運費用', amount: 16000, note: '工作室租金' },
+            { date: '2025-12-02', type: 'expense', category: '營運費用', amount: 404, note: '工作室水電費' },
+            { date: '2025-12-02', type: 'expense', category: '進修', amount: 500, note: '小米課程' },
+            { date: '2025-12-02', type: 'expense', category: '營運費用', amount: 1000, note: '大毛 - 包窯' },
+            { date: '2025-12-02', type: 'expense', category: '營運費用', amount: 250, note: '大毛 - 時數會員' },
+            { date: '2025-12-02', type: 'expense', category: '雜項', amount: 392, note: '大毛工作室交際點心' },
+            { date: '2025-12-02', type: 'expense', category: '薪資', amount: 18354, note: 'Chiau薪水' },
+            { date: '2025-12-03', type: 'expense', category: '材料採購', amount: 1050, note: '白陶' },
+            { date: '2025-12-03', type: 'expense', category: '材料採購', amount: 170, note: '石膏粉' },
+        ];
+
+        // --- 圖示組件 ---
+        const LucideIcon = ({ name, size = 20, className = "" }) => {
+            const elementRef = useRef(null);
+            useEffect(() => {
+                if (window.lucide && elementRef.current) {
+                    const pascalName = name.replace(/(^\w|-\w)/g, (m) => m.replace("-", "").toUpperCase());
+                    const iconDef = window.lucide.icons[pascalName];
+                    if (iconDef) {
+                        const svg = window.lucide.createElement(iconDef);
+                        svg.setAttribute('width', size);
+                        svg.setAttribute('height', size);
+                        if (className) svg.setAttribute('class', className);
+                        elementRef.current.innerHTML = '';
+                        elementRef.current.appendChild(svg);
+                    }
+                }
+            }, [name, size, className]);
+            return <span ref={elementRef} style={{ display: 'inline-flex' }} />;
+        };
+
+        const Icons = {
+            LayoutDashboard: (props) => <LucideIcon name="layout-dashboard" {...props} />,
+            Wallet: (props) => <LucideIcon name="wallet" {...props} />,
+            Anvil: (props) => <LucideIcon name="anvil" {...props} />,
+            Package: (props) => <LucideIcon name="package" {...props} />,
+            ArrowRightLeft: (props) => <LucideIcon name="arrow-right-left" {...props} />, 
+            TrendingUp: (props) => <LucideIcon name="trending-up" {...props} />,
+            TrendingDown: (props) => <LucideIcon name="trending-down" {...props} />,
+            ArrowRight: (props) => <LucideIcon name="arrow-right" {...props} />,
+            Plus: (props) => <LucideIcon name="plus" {...props} />,
+            Filter: (props) => <LucideIcon name="filter" {...props} />,
+            CreditCard: (props) => <LucideIcon name="credit-card" {...props} />,
+            PieChart: (props) => <LucideIcon name="pie-chart" {...props} />,
+            BarChart3: (props) => <LucideIcon name="bar-chart-3" {...props} />,
+            AlertCircle: (props) => <LucideIcon name="alert-circle" {...props} />,
+            Coins: (props) => <LucideIcon name="coins" {...props} />,
+            Receipt: (props) => <LucideIcon name="receipt" {...props} />,
+            Tag: (props) => <LucideIcon name="tag" {...props} />,
+            Edit2: (props) => <LucideIcon name="edit-2" {...props} />,
+            Check: (props) => <LucideIcon name="check" {...props} />,
+            X: (props) => <LucideIcon name="x" {...props} />,
+            Trash2: (props) => <LucideIcon name="trash-2" {...props} />,
+            Banknote: (props) => <LucideIcon name="banknote" {...props} />,
+            Building2: (props) => <LucideIcon name="building-2" {...props} />,
+            Database: (props) => <LucideIcon name="database" {...props} />,
+        };
+
+        // --- UI 組件 ---
+        const Card = ({ title, value, icon, subtext, colorClass = "text-stone-800" }) => (
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
+                <div className="flex justify-between items-start">
+                    <div>
+                        <p className="text-stone-500 text-sm font-medium mb-1">{title}</p>
+                        <h3 className={`text-2xl font-bold ${colorClass}`}>${value.toLocaleString()}</h3>
+                    </div>
+                    <div className={`p-2 rounded-lg ${colorClass === "text-red-600" ? "bg-red-50" : "bg-stone-100"}`}>
+                        {icon}
+                    </div>
+                </div>
+                {subtext && <p className="text-xs text-stone-400 mt-2">{subtext}</p>}
+            </div>
+        );
+
+        const ChartCard = ({ title, children }) => (
+            <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
+                <h3 className="font-bold text-stone-700 mb-6 flex items-center gap-2 text-sm uppercase tracking-wider">
+                    <Icons.BarChart3 size={16} /> {title}
+                </h3>
+                {children}
+            </div>
+        );
+
+        const SectionTitle = ({ title, subtitle }) => (
+            <div className="mb-6">
+                <h2 className="text-2xl font-bold text-stone-800">{title}</h2>
+                {subtitle && <p className="text-stone-500 text-sm">{subtitle}</p>}
+            </div>
+        );
+
+        const Button = ({ children, onClick, variant = 'primary', className = '' }) => {
+            const baseStyle = "px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2";
+            const variants = {
+                primary: "bg-amber-700 text-white hover:bg-amber-800",
+                secondary: "bg-white text-stone-700 border border-stone-300 hover:bg-stone-50",
+                danger: "bg-red-50 text-red-600 hover:bg-red-100 border border-red-200",
+                ghost: "text-stone-500 hover:text-stone-700 hover:bg-stone-100",
+                outline: "bg-transparent text-stone-600 border border-stone-300 hover:bg-stone-50"
+            };
+            return (
+                <button onClick={onClick} className={`${baseStyle} ${variants[variant]} ${className}`}>
+                    {children}
+                </button>
+            );
+        };
+
+        const SimplePieChart = ({ data, size = 140 }) => {
+            if (!data || data.length === 0) return <div className="text-stone-300 text-xs">無數據</div>;
+            let currentAngle = 0;
+            const gradientParts = data.map(item => {
+                const start = currentAngle;
+                const end = currentAngle + item.percent;
+                currentAngle = end;
+                return `${item.color} ${start}% ${end}%`;
+            });
+            const gradientString = `conic-gradient(${gradientParts.join(', ')})`;
+            return (
+                <div className="flex flex-col items-center justify-center gap-4">
+                    <div className="rounded-full shadow-inner relative flex items-center justify-center shrink-0" style={{ width: size, height: size, background: gradientString }}>
+                        <div className="w-2/3 h-2/3 bg-white rounded-full absolute"></div>
+                    </div>
+                    <div className="space-y-1 w-full max-w-[200px]">
+                        {data.map((item, idx) => (
+                            <div key={idx} className="flex justify-between items-center text-xs w-full">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full" style={{ background: item.color }}></div>
+                                    <span className="text-stone-600 truncate max-w-[80px]">{item.label}</span>
+                                </div>
+                                <div className="flex gap-2"><span className="text-stone-400">{Math.round(item.percent)}%</span><span className="font-bold text-stone-700">${item.value.toLocaleString()}</span></div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const SimpleBarChart = ({ income, expense }) => {
+            const max = Math.max(income, expense, 1);
+            const safeMax = max === 0 ? 1 : max;
+            const incomeHeight = (income / safeMax) * 100;
+            const expenseHeight = (expense / safeMax) * 100;
+            return (
+                <div className="w-full flex items-end justify-center gap-12 h-48 px-4 pb-2 border-b border-stone-200 mt-4">
+                    <div className="flex flex-col items-center gap-2 group w-20">
+                        <span className="text-xs font-bold text-green-700 mb-1">${income.toLocaleString()}</span>
+                        <div className="w-full bg-green-500 rounded-t-lg transition-all duration-500 hover:bg-green-600 relative group-hover:shadow-lg" style={{ height: `${incomeHeight}%`, minHeight: income > 0 ? '4px' : '0' }}></div>
+                        <span className="text-sm font-bold text-stone-600 mt-2">總收入</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-2 group w-20">
+                        <span className="text-xs font-bold text-red-700 mb-1">${expense.toLocaleString()}</span>
+                        <div className="w-full bg-red-500 rounded-t-lg transition-all duration-500 hover:bg-red-600 relative group-hover:shadow-lg" style={{ height: `${expenseHeight}%`, minHeight: expense > 0 ? '4px' : '0' }}></div>
+                        <span className="text-sm font-bold text-stone-600 mt-2">總支出</span>
+                    </div>
+                </div>
+            );
+        };
+
+        const CategoryBar = ({ data }) => {
+            const max = Math.max(...data.map(d => d.value), 1);
+            return (
+                <div className="space-y-3">
+                {data.map((item, idx) => (
+                    <div key={idx}>
+                    <div className="flex justify-between text-xs mb-1">
+                        <span className="text-stone-600 font-medium">{item.label}</span>
+                        <span className="text-stone-800 font-bold">${item.value.toLocaleString()}</span>
+                    </div>
+                    <div className="w-full bg-stone-100 rounded-full h-2 overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${(item.value / max) * 100}%`, background: item.color }}></div>
+                    </div>
+                    </div>
+                ))}
+                </div>
+            );
+        };
+
+        // --- 應用程式邏輯 ---
+
+        function PotteryStudioManager() {
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [loading, setLoading] = useState(true);
+            const [funds, setFunds] = useState([]);
+            const [assets, setAssets] = useState([]);
+            const [inventory, setInventory] = useState([]);
+            const [transactions, setTransactions] = useState([]);
+
+            // Form States
+            const [newIncome, setNewIncome] = useState({ category: '網路開賣', amount: '', note: '' });
+            const [newExpense, setNewExpense] = useState({ category: '營運費用', amount: '', note: '' });
+            const [newItem, setNewItem] = useState({ name: '', quantity: '', unit: '', unitCost: '', category: '土類' });
+            const [consumeAmount, setConsumeAmount] = useState({});
+            const [repaymentAmount, setRepaymentAmount] = useState({});
+            const [newAsset, setNewAsset] = useState({ name: '', value: '', date: new Date().toISOString().split('T')[0], category: '設備' });
+            const [newFund, setNewFund] = useState({ name: '', type: 'capital', amount: '', note: '', date: new Date().toISOString().split('T')[0] });
+            const [filterCategory, setFilterCategory] = useState('all');
+            
+            // Edit States
+            const [editingInvId, setEditingInvId] = useState(null);
+            const [editInvData, setEditInvData] = useState({});
+            const [editingAssetId, setEditingAssetId] = useState(null);
+            const [editAssetData, setEditAssetData] = useState({});
+
+            const INCOME_CATEGORIES = ['網路開賣', '市集', '課程收入', '回饋金', '其他'];
+            const EXPENSE_CATEGORIES = ['營運費用', '材料採購', '薪資', '運費', '雜項', '抽成', '進修', '其他'];
+            const ASSET_CATEGORIES = ['設備', '工具', '道具', '押金資產', '其他'];
+            const INVENTORY_CATEGORIES = ['土類', '包材', '釉藥/色粉', '原料/化學', '其他'];
+
+            useEffect(() => {
+                fetchData();
+            }, []);
+
+            useEffect(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+
+            const fetchData = async () => {
+                setLoading(true);
+                try {
+                    const { data: f } = await supabase.from('funds').select('*').order('id', { ascending: true });
+                    const { data: a } = await supabase.from('assets').select('*').order('id', { ascending: true });
+                    const { data: i } = await supabase.from('inventory').select('*').order('id', { ascending: true });
+                    const { data: t } = await supabase.from('transactions').select('*').order('date', { ascending: false });
+
+                    setFunds(f || []);
+                    setAssets(a || []);
+                    setInventory(i || []);
+                    setTransactions(t || []);
+                } catch (error) {
+                    console.error("Error fetching data:", error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            // 初始化範例資料功能
+            const initializeSampleData = async () => {
+                if (!confirm("確定要匯入範例資料嗎？這將會把所有 2025 年的資料寫入您的資料庫。")) return;
+                setLoading(true);
+                try {
+                    // 檢查是否已經有資料，避免重複
+                    if (funds.length === 0 && assets.length === 0 && inventory.length === 0 && transactions.length === 0) {
+                        await supabase.from('funds').insert(SAMPLE_FUNDS);
+                        await supabase.from('assets').insert(SAMPLE_ASSETS);
+                        await supabase.from('inventory').insert(SAMPLE_INVENTORY);
+                        await supabase.from('transactions').insert(SAMPLE_TRANSACTIONS);
+                        alert("範例資料匯入成功！");
+                        fetchData();
+                    } else {
+                        alert("資料庫非空，取消匯入以避免資料重複。");
+                    }
+                } catch (e) {
+                    alert("匯入失敗: " + e.message);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            // Calculations
+            const totalFunds = funds.filter(f => f.type === 'capital').reduce((acc, cur) => acc + cur.amount, 0);
+            const totalLiabilities = funds.filter(f => f.type === 'liability').reduce((acc, cur) => acc + cur.amount, 0);
+            const totalAssetsValue = assets.reduce((acc, cur) => acc + cur.value, 0);
+            const totalInventoryValue = inventory.reduce((acc, cur) => acc + (cur.quantity * cur.unitCost), 0);
+            const totalIncome = transactions.filter(t => t.type === 'income').reduce((acc, cur) => acc + cur.amount, 0);
+            const totalExpense = transactions.filter(t => t.type === 'expense').reduce((acc, cur) => acc + cur.amount, 0);
+            const totalRepayment = transactions.filter(t => t.type === 'expense' && t.note && t.note.includes('還款')).reduce((acc, cur) => acc + cur.amount, 0);
+            const cashFlow = (totalFunds + totalLiabilities + totalIncome) - (totalExpense - totalRepayment) - (totalAssetsValue + totalInventoryValue);
+            const netWorth = cashFlow + totalAssetsValue + totalInventoryValue - totalLiabilities;
+
+            // Handlers (Supabase)
+            const handleAddTransaction = async (isIncome) => {
+                const data = isIncome ? newIncome : newExpense;
+                if (!data.amount || !data.category) return;
+                
+                const newTrans = {
+                    date: new Date().toISOString().split('T')[0],
+                    type: isIncome ? 'income' : 'expense',
+                    amount: parseInt(data.amount),
+                    category: data.category,
+                    note: data.note
+                };
+
+                const { error } = await supabase.from('transactions').insert([newTrans]);
+                if (!error) {
+                    fetchData();
+                    if (isIncome) setNewIncome({ category: '網路開賣', amount: '', note: '' });
+                    else setNewExpense({ category: '營運費用', amount: '', note: '' });
+                } else {
+                    alert("新增失敗");
+                }
+            };
+
+            const handleDeleteTransaction = async (id) => {
+                if(confirm('確定要刪除此紀錄嗎？')) {
+                    const { error } = await supabase.from('transactions').delete().eq('id', id);
+                    if (!error) fetchData();
+                }
+            };
+
+            const handleAddInventory = async () => {
+                if(!newItem.name || !newItem.unitCost) return;
+                const { error } = await supabase.from('inventory').insert([{
+                    ...newItem,
+                    quantity: parseFloat(newItem.quantity),
+                    unitCost: parseFloat(newItem.unitCost),
+                    minStock: 5
+                }]);
+                if (!error) {
+                    fetchData();
+                    setNewItem({ name: '', quantity: '', unit: '', unitCost: '', category: '土類' });
+                }
+            };
+
+            const handleConsumeInventory = async (item) => {
+                const amount = parseFloat(consumeAmount[item.id]);
+                if (!amount || amount <= 0 || amount > item.quantity) return alert("數量無效");
+                
+                // 1. Update Inventory
+                await supabase.from('inventory').update({ quantity: item.quantity - amount }).eq('id', item.id);
+                
+                // 2. Add Expense
+                const cost = amount * item.unitCost;
+                await supabase.from('transactions').insert([{
+                    date: new Date().toISOString().split('T')[0],
+                    type: 'expense',
+                    category: '材料採購',
+                    amount: cost,
+                    note: `消耗: ${item.name} x ${amount}${item.unit}`
+                }]);
+                
+                setConsumeAmount({ ...consumeAmount, [item.id]: '' });
+                alert(`已消耗 ${item.name}，並紀錄支出 $${cost}`);
+                fetchData();
+            };
+
+            const handleStartEditInv = (item) => { setEditingInvId(item.id); setEditInvData({...item}); };
+            const handleSaveEditInv = async () => {
+                const { error } = await supabase.from('inventory').update({
+                    name: editInvData.name,
+                    category: editInvData.category,
+                    quantity: editInvData.quantity,
+                    unitCost: editInvData.unitCost
+                }).eq('id', editingInvId);
+                if (!error) { setEditingInvId(null); fetchData(); }
+            };
+            const handleDeleteInv = async (id) => {
+                if(confirm('確定刪除？')) { await supabase.from('inventory').delete().eq('id', id); fetchData(); }
+            };
+
+            const handleAddAsset = async () => {
+                if (!newAsset.name || !newAsset.value) return;
+                const { error } = await supabase.from('assets').insert([{
+                    ...newAsset, value: parseInt(newAsset.value)
+                }]);
+                if(!error) { fetchData(); setNewAsset({ name: '', value: '', date: new Date().toISOString().split('T')[0], category: '設備' }); }
+            };
+
+            const handleStartEditAsset = (item) => { setEditingAssetId(item.id); setEditAssetData({...item}); };
+            const handleSaveEditAsset = async () => {
+                 const { error } = await supabase.from('assets').update({
+                    name: editAssetData.name,
+                    category: editAssetData.category,
+                    value: editAssetData.value,
+                    date: editAssetData.date
+                }).eq('id', editingAssetId);
+                if (!error) { setEditingAssetId(null); fetchData(); }
+            };
+            const handleDeleteAsset = async (id) => {
+                if(confirm('確定刪除？')) { await supabase.from('assets').delete().eq('id', id); fetchData(); }
+            };
+
+            const handleAddFund = async () => {
+                if (!newFund.name || !newFund.amount) return;
+                const { error } = await supabase.from('funds').insert([{ ...newFund, amount: parseInt(newFund.amount) }]);
+                if(!error) { fetchData(); setNewFund({ name: '', type: 'capital', amount: '', note: '', date: new Date().toISOString().split('T')[0] }); }
+            };
+
+            const handleRepayment = async (fund) => {
+                const amount = parseFloat(repaymentAmount[fund.id]);
+                if (!amount || amount <= 0 || amount > fund.amount) return alert("金額無效");
+                
+                await supabase.from('funds').update({ amount: fund.amount - amount }).eq('id', fund.id);
+                await supabase.from('transactions').insert([{
+                    date: new Date().toISOString().split('T')[0],
+                    type: 'expense',
+                    category: '其他',
+                    amount: amount,
+                    note: `還款: ${fund.name}`
+                }]);
+                setRepaymentAmount({ ...repaymentAmount, [fund.id]: '' });
+                alert("還款成功");
+                fetchData();
+            };
+
+            // Helper Functions for Charts
+            const prepareExpenseCategoryData = (dataSource) => {
+                const categories = {};
+                const dataToUse = dataSource || transactions.filter(t => t.type === 'expense');
+                const total = dataToUse.reduce((acc, cur) => acc + cur.amount, 0);
+                if (total === 0) return [];
+                dataToUse.forEach(t => { categories[t.category] = (categories[t.category] || 0) + t.amount; });
+                const colors = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#10b981', '#06b6d4', '#3b82f6', '#6366f1'];
+                return Object.entries(categories).sort((a, b) => b[1] - a[1]).map(([label, value], index) => ({ label, value, percent: (value / total) * 100, color: colors[index % colors.length] }));
+            };
+
+            const prepareFundsChartData = () => {
+                const total = totalFunds + totalLiabilities;
+                if (total === 0) return [];
+                return [ { label: '自有資金', value: totalFunds, percent: (totalFunds / total) * 100, color: '#3b82f6' }, { label: '負債/借款', value: totalLiabilities, percent: (totalLiabilities / total) * 100, color: '#ef4444' } ];
+            };
+
+            // --- Render ---
+            const renderContent = () => {
+                if (loading) return <div className="flex justify-center items-center h-64 text-stone-500">載入資料中...</div>;
+
+                switch (activeTab) {
+                    case 'dashboard':
+                        const recentTransactions = transactions.slice(0, 5);
+                        const lowStockItems = inventory.filter(i => i.quantity <= i.minStock);
+                        return (
+                            <div className="space-y-6">
+                                <div className="flex justify-between items-end">
+                                    <SectionTitle title="工作室總覽" subtitle="財務狀況即時儀表板" />
+                                    {/* 首次使用時可開啟此按鈕 */}
+                                    {transactions.length === 0 && <Button onClick={initializeSampleData} variant="outline" className="text-xs mb-6"><Icons.Database size={14}/> 匯入範例資料</Button>}
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <Card title="工作室淨值" value={netWorth} icon={<Icons.Wallet className="text-amber-700" size={20} />} colorClass="text-amber-700" subtext="資產 - 負債 + 淨利" />
+                                    <Card title="本期淨利" value={totalIncome - totalExpense} icon={<Icons.TrendingUp className={totalIncome - totalExpense >= 0 ? "text-green-600" : "text-red-600"} size={20} />} colorClass={totalIncome - totalExpense >= 0 ? "text-green-600" : "text-red-600"} subtext="總收入 - 總支出" />
+                                    <Card title="總資產價值" value={totalAssetsValue + totalInventoryValue} icon={<Icons.Anvil className="text-stone-600" size={20} />} colorClass="text-stone-600" subtext="設備 + 庫存" />
+                                    <Card title="負債總額" value={totalLiabilities} icon={<Icons.AlertCircle className="text-red-600" size={20} />} colorClass="text-red-600" subtext="待償還金額" />
+                                </div>
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
+                                        <h3 className="font-bold text-stone-700 mb-6 flex items-center gap-2 text-sm uppercase tracking-wider"><Icons.BarChart3 size={16} /> 收支概況</h3>
+                                        <SimpleBarChart income={totalIncome} expense={totalExpense} />
+                                    </div>
+                                    <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
+                                        <h3 className="font-bold text-stone-700 mb-6 flex items-center gap-2 text-sm uppercase tracking-wider"><Icons.PieChart size={16} /> 資金結構</h3>
+                                        <SimplePieChart data={prepareFundsChartData()} />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
+                                        <h3 className="font-bold text-stone-700 mb-4 text-sm uppercase tracking-wider flex items-center gap-2"><Icons.Receipt size={16} /> 近期收支紀錄</h3>
+                                        <div className="space-y-3">
+                                            {recentTransactions.map(t => (
+                                                <div key={t.id} className="flex justify-between items-center p-3 bg-stone-50 rounded-lg">
+                                                    <div className="flex items-center gap-3"><div className={`w-2 h-2 rounded-full ${t.type === 'income' ? 'bg-green-500' : 'bg-red-500'}`}></div><div><p className="font-medium text-stone-800">{t.category}</p><p className="text-xs text-stone-500">{t.date} | {t.note}</p></div></div>
+                                                    <span className={`font-bold ${t.type === 'income' ? 'text-green-700' : 'text-red-700'}`}>{t.type === 'income' ? '+' : '-'}${t.amount.toLocaleString()}</span>
+                                                </div>
+                                            ))}
+                                            {recentTransactions.length === 0 && <p className="text-xs text-stone-400">尚無紀錄</p>}
+                                        </div>
+                                    </div>
+                                    <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm h-full">
+                                        <h3 className="font-bold text-stone-700 mb-4 text-sm uppercase tracking-wider flex items-center gap-2"><Icons.AlertCircle size={16} /> 庫存預警清單</h3>
+                                        <div className="space-y-3">
+                                            {lowStockItems.map(item => (
+                                                <div key={item.id} className="flex justify-between items-center border-b border-stone-100 pb-2 last:border-0">
+                                                    <div><p className="font-medium text-stone-800">{item.name}</p><p className="text-xs text-stone-500">剩餘: {item.quantity} {item.unit}</p></div>
+                                                    <span className="px-2 py-1 bg-red-100 text-red-600 text-xs rounded-full font-bold flex items-center gap-1">低庫存</span>
+                                                </div>
+                                            ))}
+                                            {lowStockItems.length === 0 && <p className="text-xs text-stone-400">目前庫存充足</p>}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    case 'income':
+                        const incomeList = transactions.filter(t => t.type === 'income');
+                        return (
+                            <div className="space-y-6">
+                                <SectionTitle title="營收管理" subtitle="收入來源紀錄與分析" />
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div className="md:col-span-1 bg-white p-6 rounded-xl border border-stone-200 shadow-sm h-fit">
+                                        <h3 className="font-bold text-stone-700 mb-4 flex items-center gap-2"><Icons.Coins size={18} /> 新增收入</h3>
+                                        <div className="space-y-4">
+                                            <div><label className="block text-xs font-bold text-stone-500 mb-1">類別</label><select className="w-full p-2 border border-stone-300 rounded bg-stone-50" value={newIncome.category} onChange={e => setNewIncome({...newIncome, category: e.target.value})}>{INCOME_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                                            <div><label className="block text-xs font-bold text-stone-500 mb-1">金額</label><input type="number" className="w-full p-2 border border-stone-300 rounded" placeholder="0" value={newIncome.amount} onChange={e => setNewIncome({...newIncome, amount: e.target.value})} /></div>
+                                            <div><label className="block text-xs font-bold text-stone-500 mb-1">備註</label><input type="text" className="w-full p-2 border border-stone-300 rounded" placeholder="例如: 10月開賣" value={newIncome.note} onChange={e => setNewIncome({...newIncome, note: e.target.value})} /></div>
+                                            <Button onClick={() => handleAddTransaction(true)} className="w-full mt-2"><Icons.Plus size={16} /> 記錄收入</Button>
+                                        </div>
+                                    </div>
+                                    <div className="md:col-span-2 space-y-4">
+                                        <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
+                                            <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-stone-700">收入明細列表</h3><span className="text-sm font-bold text-green-700 bg-green-50 px-3 py-1 rounded-full">總收入: ${totalIncome.toLocaleString()}</span></div>
+                                            <div className="space-y-2 h-[500px] overflow-y-auto pr-2">
+                                                {incomeList.map(t => (
+                                                    <div key={t.id} className="flex justify-between items-center p-3 border-b border-stone-100 hover:bg-stone-50 group">
+                                                        <div className="flex items-center gap-3"><div className="p-2 rounded-full bg-green-100 text-green-600"><Icons.TrendingUp size={16} /></div><div><p className="font-bold text-stone-800">{t.category}</p><p className="text-xs text-stone-500">{t.date} · {t.note}</p></div></div>
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="font-bold text-green-700">+${t.amount.toLocaleString()}</span>
+                                                            <button onClick={() => handleDeleteTransaction(t.id)} className="text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Icons.Trash2 size={16} /></button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {incomeList.length === 0 && <p className="text-stone-400 text-center py-4">尚無收入紀錄</p>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    case 'expenses':
+                        const expenseList = transactions.filter(t => t.type === 'expense' && (filterCategory === 'all' || t.category === filterCategory));
+                        const filteredTotalExpense = expenseList.reduce((acc, cur) => acc + cur.amount, 0);
+                        const expenseChartData = prepareExpenseCategoryData(expenseList);
+                        return (
+                            <div className="space-y-6">
+                                <SectionTitle title="支出管理" subtitle="成本控制與費用追蹤" />
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                                    <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm flex flex-col justify-center"><p className="text-stone-500 text-sm font-bold mb-1">本期總支出</p><h2 className="text-3xl font-bold text-red-600">${filteredTotalExpense.toLocaleString()}</h2><p className="text-xs text-stone-400 mt-2">共 {expenseList.length} 筆紀錄</p></div>
+                                    <div className="md:col-span-2 bg-white p-6 rounded-xl border border-stone-200 shadow-sm"><h3 className="font-bold text-stone-700 mb-4 text-sm uppercase tracking-wider flex items-center gap-2"><Icons.PieChart size={16} /> 支出類別佔比</h3><div className="flex justify-center"><SimplePieChart data={expenseChartData} size={160} /></div></div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div className="md:col-span-1 bg-white p-6 rounded-xl border border-stone-200 shadow-sm h-fit">
+                                        <h3 className="font-bold text-stone-700 mb-4 flex items-center gap-2"><Icons.Receipt size={18} /> 新增支出</h3>
+                                        <div className="space-y-4">
+                                            <div><label className="block text-xs font-bold text-stone-500 mb-1">類別</label><select className="w-full p-2 border border-stone-300 rounded bg-stone-50" value={newExpense.category} onChange={e => setNewExpense({...newExpense, category: e.target.value})}>{EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                                            <div><label className="block text-xs font-bold text-stone-500 mb-1">金額</label><input type="number" className="w-full p-2 border border-stone-300 rounded" placeholder="0" value={newExpense.amount} onChange={e => setNewExpense({...newExpense, amount: e.target.value})} /></div>
+                                            <div><label className="block text-xs font-bold text-stone-500 mb-1">備註</label><input type="text" className="w-full p-2 border border-stone-300 rounded" placeholder="例如: 房租、電費" value={newExpense.note} onChange={e => setNewExpense({...newExpense, note: e.target.value})} /></div>
+                                            <Button onClick={() => handleAddTransaction(false)} className="w-full mt-2" variant="danger"><Icons.Plus size={16} /> 記錄支出</Button>
+                                        </div>
+                                    </div>
+                                    <div className="md:col-span-2 space-y-4">
+                                        <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
+                                            <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-stone-700">支出明細列表</h3><select className="text-sm border border-stone-300 rounded p-1" value={filterCategory} onChange={e => setFilterCategory(e.target.value)}><option value="all">所有類別</option>{EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                                            <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
+                                                {expenseList.map(t => (
+                                                    <div key={t.id} className="flex justify-between items-center p-3 border-b border-stone-100 hover:bg-stone-50 group">
+                                                        <div className="flex items-center gap-3"><div className="p-2 rounded-full bg-red-50 text-red-600"><Icons.TrendingDown size={16} /></div><div><p className="font-bold text-stone-800">{t.category}</p><p className="text-xs text-stone-500">{t.date} · {t.note}</p></div></div>
+                                                        <div className="flex items-center gap-3"><span className="font-bold text-red-700">-${t.amount.toLocaleString()}</span><button onClick={() => handleDeleteTransaction(t.id)} className="text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Icons.Trash2 size={16} /></button></div>
+                                                    </div>
+                                                ))}
+                                                {expenseList.length === 0 && <p className="text-stone-400 text-center py-4">無符合條件的紀錄</p>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    case 'inventory': return (
+                         <div className="space-y-6">
+                            <SectionTitle title="材料庫存管理" subtitle="消耗庫存將自動轉為支出成本" />
+                            <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm flex items-center justify-between mb-2"><div><h3 className="font-bold text-stone-700 flex items-center gap-2"><Icons.Package size={20} /> 庫存資產總覽</h3><p className="text-xs text-stone-400 mt-1">所有材料的當前總價值</p></div><div className="text-right"><p className="text-3xl font-bold text-amber-600">${totalInventoryValue.toLocaleString()}</p><p className="text-xs text-stone-500">共 {inventory.length} 項材料</p></div></div>
+                            <div className="bg-stone-100 p-4 rounded-lg flex flex-wrap gap-3 items-end">
+                                <div className="flex-1 min-w-[150px]"><label className="text-xs font-bold text-stone-500 ml-1">材料名稱</label><input type="text" value={newItem.name} onChange={(e) => setNewItem({...newItem, name: e.target.value})} className="w-full p-2 rounded border border-stone-300" placeholder="例如: 日本白瓷土" /></div>
+                                <div className="w-28"><label className="text-xs font-bold text-stone-500 ml-1">分類</label><select className="w-full p-2 rounded border border-stone-300 bg-white" value={newItem.category} onChange={(e) => setNewItem({...newItem, category: e.target.value})}>{INVENTORY_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                                <div className="w-24"><label className="text-xs font-bold text-stone-500 ml-1">數量</label><input type="number" value={newItem.quantity} onChange={(e) => setNewItem({...newItem, quantity: e.target.value})} className="w-full p-2 rounded border border-stone-300" placeholder="0" /></div>
+                                <div className="w-24"><label className="text-xs font-bold text-stone-500 ml-1">單位</label><input type="text" value={newItem.unit} onChange={(e) => setNewItem({...newItem, unit: e.target.value})} className="w-full p-2 rounded border border-stone-300" placeholder="包/kg" /></div>
+                                <div className="w-32"><label className="text-xs font-bold text-stone-500 ml-1">單位成本($)</label><input type="number" value={newItem.unitCost} onChange={(e) => setNewItem({...newItem, unitCost: e.target.value})} className="w-full p-2 rounded border border-stone-300" placeholder="0" /></div>
+                                <Button onClick={handleAddInventory}><Icons.Plus size={16} /> 入庫</Button>
+                            </div>
+                            <div className="overflow-x-auto bg-white rounded-xl border border-stone-200 shadow-sm">
+                                <table className="w-full text-left"><thead className="bg-stone-50 text-stone-500 text-sm"><tr><th className="p-4">材料名稱</th><th className="p-4">分類</th><th className="p-4">目前數量</th><th className="p-4">單位成本</th><th className="p-4">庫存總值</th><th className="p-4 w-[250px]">消耗操作 / 編輯</th></tr></thead>
+                                <tbody className="divide-y divide-stone-100">{inventory.map(item => (<tr key={item.id} className="hover:bg-stone-50">{editingInvId === item.id ? (<><td className="p-2"><input type="text" className="w-full border p-1 rounded" value={editInvData.name} onChange={e => setEditInvData({...editInvData, name: e.target.value})} /></td><td className="p-2"><select className="w-full border p-1 rounded" value={editInvData.category} onChange={e => setEditInvData({...editInvData, category: e.target.value})}>{INVENTORY_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></td><td className="p-2"><input type="number" className="w-full border p-1 rounded" value={editInvData.quantity} onChange={e => setEditInvData({...editInvData, quantity: parseFloat(e.target.value)})} /></td><td className="p-2"><input type="number" className="w-full border p-1 rounded" value={editInvData.unitCost} onChange={e => setEditInvData({...editInvData, unitCost: parseFloat(e.target.value)})} /></td><td className="p-4 font-bold text-stone-400">---</td><td className="p-2 flex gap-2"><Button onClick={handleSaveEditInv} className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 text-xs"><Icons.Check size={14} /> 儲存</Button><Button onClick={() => setEditingInvId(null)} className="bg-gray-400 hover:bg-gray-500 text-white px-2 py-1 text-xs"><Icons.X size={14} /> 取消</Button></td></>) : (<><td className="p-4 font-medium text-stone-800">{item.name}</td><td className="p-4"><span className={`text-xs px-2 py-1 rounded-full ${item.category === '土類' ? 'bg-amber-100 text-amber-700' : item.category === '包材' ? 'bg-blue-100 text-blue-700' : item.category === '原料/化學' ? 'bg-purple-100 text-purple-700' : item.category === '釉藥/色粉' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-700'}`}>{item.category || '其他'}</span></td><td className="p-4"><span className={`font-bold ${item.quantity <= item.minStock ? 'text-red-600' : 'text-stone-800'}`}>{item.quantity}</span> <span className="text-stone-400 text-sm ml-1">{item.unit}</span></td><td className="p-4 text-stone-600">${item.unitCost}</td><td className="p-4 font-bold text-stone-800">${(item.quantity * item.unitCost).toLocaleString()}</td><td className="p-4"><div className="flex gap-2 items-center"><input type="number" className="w-16 p-1 border border-stone-300 rounded text-sm" placeholder="數量" value={consumeAmount[item.id] || ''} onChange={(e) => setConsumeAmount({...consumeAmount, [item.id]: e.target.value})} /><button onClick={() => handleConsumeInventory(item)} className="px-2 py-1 bg-amber-100 text-amber-800 rounded text-xs hover:bg-amber-200 flex items-center gap-1">消耗</button><div className="w-[1px] h-4 bg-stone-300 mx-1"></div><button onClick={() => handleStartEditInv(item)} className="text-stone-400 hover:text-stone-600"><Icons.Edit2 size={16} /></button><button onClick={() => handleDeleteInv(item.id)} className="text-red-300 hover:text-red-500"><Icons.Trash2 size={16} /></button></div></td></>)}</tr>))}</tbody></table>
+                            </div>
+                        </div>
+                    );
+                    case 'capital': return (
+                        <div className="space-y-6">
+                            <SectionTitle title="資金來源管理" subtitle="管理創業資金、銀行貸款與負債" />
+                            <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm grid grid-cols-1 md:grid-cols-6 gap-4 items-end mb-6">
+                                <div className="col-span-1"><label className="block text-sm font-bold text-stone-600 mb-1">類型</label><select value={newFund.type} onChange={(e) => setNewFund({...newFund, type: e.target.value})} className="w-full p-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white"><option value="capital">自有資金 (資本)</option><option value="liability">負債/貸款</option></select></div>
+                                <div className="col-span-1"><label className="block text-sm font-bold text-stone-600 mb-1">日期</label><input type="date" value={newFund.date} onChange={(e) => setNewFund({...newFund, date: e.target.value})} className="w-full p-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none" /></div>
+                                <div className="col-span-1"><label className="block text-sm font-bold text-stone-600 mb-1">名稱</label><input type="text" value={newFund.name} onChange={(e) => setNewFund({...newFund, name: e.target.value})} className="w-full p-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none" placeholder="來源/債主" /></div>
+                                <div className="col-span-1"><label className="block text-sm font-bold text-stone-600 mb-1">金額</label><input type="number" value={newFund.amount} onChange={(e) => setNewFund({...newFund, amount: e.target.value})} className="w-full p-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none" placeholder="0" /></div>
+                                <div className="col-span-1"><label className="block text-sm font-bold text-stone-600 mb-1">備註</label><input type="text" value={newFund.note} onChange={(e) => setNewFund({...newFund, note: e.target.value})} className="w-full p-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none" placeholder="選填" /></div>
+                                <div className="col-span-1"><Button onClick={handleAddFund} className="w-full"><Icons.Plus size={18} /> 新增</Button></div>
+                            </div>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
+                                    <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-stone-700 flex items-center gap-2"><Icons.Wallet size={20} /> 目前資金結構</h3></div>
+                                    <div className="space-y-4">
+                                        {funds.map(f => (
+                                            <div key={f.id} className="flex flex-col sm:flex-row justify-between sm:items-center p-3 border border-stone-100 rounded-lg gap-3">
+                                                <div><div className="flex items-center gap-2"><p className="font-bold text-stone-800">{f.name}</p><span className="text-xs text-stone-400">({f.date || '無日期'})</span></div><span className={`text-xs px-2 py-0.5 rounded-full ${f.type === 'capital' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>{f.type === 'capital' ? '自有資金' : '負債/貸款'}</span>{f.note && <p className="text-xs text-stone-400 mt-1">{f.note}</p>}</div>
+                                                <div className="flex items-center gap-4">
+                                                    <p className="font-mono font-bold text-lg">${f.amount.toLocaleString()}</p>
+                                                    {f.type === 'liability' && f.amount > 0 && (<div className="flex items-center gap-2"><input type="number" placeholder="還款" className="w-20 p-1 text-sm border border-stone-300 rounded" value={repaymentAmount[f.id] || ''} onChange={(e) => setRepaymentAmount({...repaymentAmount, [f.id]: e.target.value})} /><Button variant="outline" className="text-xs px-2 py-1 h-auto border-red-200 text-red-600 hover:bg-red-50" onClick={() => handleRepayment(f)}><Icons.CreditCard size={14} /></Button></div>)}
+                                                    {f.type === 'liability' && f.amount === 0 && (<span className="text-xs font-bold text-green-600 px-2 py-1 bg-green-50 rounded">已還清</span>)}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="mt-4 pt-4 border-t border-stone-100 flex justify-between text-sm"><span className="text-stone-500">淨現金資本 (資金 - 負債)</span><span className="font-bold text-stone-800">${(totalFunds - totalLiabilities).toLocaleString()}</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                    case 'assets': return (
+                        <div className="space-y-6">
+                            <SectionTitle title="設備資產管理" subtitle="管理窯爐、拉胚機等固定資產" />
+                            <div className="bg-stone-100 p-4 rounded-lg flex flex-wrap gap-3 items-end">
+                                <div className="flex-1 min-w-[200px]"><label className="text-xs font-bold text-stone-500 ml-1">設備名稱</label><input type="text" value={newAsset.name} onChange={(e) => setNewAsset({...newAsset, name: e.target.value})} className="w-full p-2 rounded border border-stone-300" placeholder="例如: 12層層架" /></div>
+                                <div className="w-28"><label className="text-xs font-bold text-stone-500 ml-1">類別</label><select className="w-full p-2 rounded border border-stone-300 bg-white" value={newAsset.category} onChange={(e) => setNewAsset({...newAsset, category: e.target.value})}>{ASSET_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                                <div className="w-32"><label className="text-xs font-bold text-stone-500 ml-1">購入金額</label><input type="number" value={newAsset.value} onChange={(e) => setNewAsset({...newAsset, value: e.target.value})} className="w-full p-2 rounded border border-stone-300" placeholder="0" /></div>
+                                <div className="w-40"><label className="text-xs font-bold text-stone-500 ml-1">購入日期</label><input type="date" value={newAsset.date} onChange={(e) => setNewAsset({...newAsset, date: e.target.value})} className="w-full p-2 rounded border border-stone-300" /></div>
+                                <Button onClick={handleAddAsset}><Icons.Plus size={16} /> 新增資產</Button>
+                            </div>
+                            <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm">
+                                <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-stone-700 flex items-center gap-2"><Icons.Anvil size={20} /> 固定設備列表</h3><div className="text-sm text-stone-500">總資產價值: <span className="font-bold text-stone-800">${totalAssetsValue.toLocaleString()}</span></div></div>
+                                <div className="space-y-4 h-[600px] overflow-y-auto pr-2">
+                                    {assets.map(a => (
+                                        <div key={a.id} className="flex justify-between items-center p-4 border border-stone-100 rounded-lg hover:bg-stone-50 transition-colors">{editingAssetId === a.id ? (<div className="flex gap-2 w-full items-center"><input type="text" className="border p-1 rounded flex-1" value={editAssetData.name} onChange={e => setEditAssetData({...editAssetData, name: e.target.value})} /><select className="border p-1 rounded w-24" value={editAssetData.category} onChange={e => setEditAssetData({...editAssetData, category: e.target.value})}>{ASSET_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select><input type="number" className="border p-1 rounded w-24" value={editAssetData.value} onChange={e => setEditAssetData({...editAssetData, value: parseFloat(e.target.value)})} /><input type="date" className="border p-1 rounded w-32" value={editAssetData.date} onChange={e => setEditAssetData({...editAssetData, date: e.target.value})} /><Button onClick={handleSaveEditAsset} className="bg-green-600 hover:bg-green-700 text-white px-2 py-1"><Icons.Check size={16} /></Button><Button onClick={() => setEditingAssetId(null)} className="bg-gray-400 hover:bg-gray-500 text-white px-2 py-1"><Icons.X size={16} /></Button></div>) : (<><div className="flex items-center gap-3"><div className={`p-2 rounded-lg ${a.category === '設備' ? 'bg-blue-100 text-blue-600' : a.category === '工具' ? 'bg-green-100 text-green-600' : a.category === '道具' ? 'bg-purple-100 text-purple-600' : 'bg-amber-100 text-amber-600'}`}><Icons.Tag size={20} /></div><div><p className="font-bold text-stone-800">{a.name}</p><div className="flex items-center gap-2 text-xs text-stone-500"><span className="bg-stone-100 px-2 py-0.5 rounded">{a.category}</span><span>購入日期: {a.date}</span></div></div></div><div className="flex items-center gap-4"><p className="font-mono font-bold text-lg text-stone-700">${a.value.toLocaleString()}</p><div className="flex gap-2"><button onClick={() => handleStartEditAsset(a)} className="text-stone-400 hover:text-stone-600"><Icons.Edit2 size={16} /></button><button onClick={() => handleDeleteAsset(a.id)} className="text-red-300 hover:text-red-500"><Icons.Trash2 size={16} /></button></div></div></>)}</div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                    default: return null;
+                }
+            };
+
+            return (
+                <div className="flex h-screen bg-stone-50 font-sans text-stone-800">
+                <aside className="w-64 bg-stone-900 text-stone-300 flex flex-col">
+                    <div className="p-6">
+                    <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+                        須白工作室
+                    </h1>
+                    <p className="text-xs text-stone-500 mt-1">Pottery Studio Manager</p>
+                    </div>
+                    
+                    <nav className="flex-1 px-4 space-y-2">
+                    <button onClick={() => setActiveTab('dashboard')} className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-colors ${activeTab === 'dashboard' ? 'bg-stone-800 text-white' : 'hover:bg-stone-800'}`}><Icons.LayoutDashboard size={20} /> 總覽儀表板</button>
+                    <button onClick={() => setActiveTab('income')} className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-colors ${activeTab === 'income' ? 'bg-stone-800 text-white' : 'hover:bg-stone-800'}`}><Icons.Coins size={20} /> 營收管理</button>
+                    <button onClick={() => setActiveTab('expenses')} className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-colors ${activeTab === 'expenses' ? 'bg-stone-800 text-white' : 'hover:bg-stone-800'}`}><Icons.Receipt size={20} /> 支出管理</button>
+                    <button onClick={() => setActiveTab('inventory')} className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-colors ${activeTab === 'inventory' ? 'bg-stone-800 text-white' : 'hover:bg-stone-800'}`}><Icons.Package size={20} /> 材料庫存</button>
+                    <div className="my-2 border-t border-stone-800"></div>
+                    <button onClick={() => setActiveTab('capital')} className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-colors ${activeTab === 'capital' ? 'bg-stone-800 text-white' : 'hover:bg-stone-800'}`}><Icons.Wallet size={20} /> 資金來源</button>
+                    <button onClick={() => setActiveTab('assets')} className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-colors ${activeTab === 'assets' ? 'bg-stone-800 text-white' : 'hover:bg-stone-800'}`}><Icons.Anvil size={20} /> 設備資產</button>
+                    </nav>
+
+                    <div className="p-6 border-t border-stone-800">
+                    <div className="text-xs text-stone-500">
+                        <p>目前版本 v2.10 (刪除圖示版)</p>
+                        <p className="mt-2">保持創作熱情，<br/>帳務交給系統。</p>
+                    </div>
+                    </div>
+                </aside>
+
+                <main className="flex-1 overflow-y-auto p-8">
+                    <div className="max-w-6xl mx-auto">
+                    {renderContent()}
+                    </div>
+                </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<PotteryStudioManager />);
+    </script>
+</body>
+</html>
